@@ -1,0 +1,16 @@
+[package]
+name = "@deckyard/jsonschema"
+version = "0.1.0"
+description = "Validate JSON values against JSON Schema (draft 2020-12)"
+license = "LGPL-3.0-only"
+authors = ["mplx <mplx@jennifer-lang.dev>"]
+capabilities = []
+keywords = ["jennifer", "deck", "json", "json-schema", "validation", "schema"]
+
+[package.urls]
+deck = "https://raw.githubusercontent.com/deckyard/deck-jsonschema/main/deck.toml"
+homepage = "https://github.com/deckyard/deck-jsonschema"
+manual = "https://deckyard.github.io/deck-jsonschema/"
+
+[engines]
+jennifer = ">=0.25.0"
