@@ -1,0 +1,47 @@
+# Suite cases this deck knowingly gets wrong, one per line, exactly as the
+# test harness names them. Every test asserts its file gets exactly these
+# wrong: a new failure fails the test, and so does an exclusion that starts
+# passing (delete its line). Grouped by reason.
+
+# Draft 2019-09 and earlier are not implemented: a $ref to an older
+# meta-schema is evaluated as 2020-12.
+optional/cross-draft.json: refs to historic drafts are processed as historic drafts / first item not a string is valid
+
+# IDNA: validating an xn-- label means decoding Punycode and checking the
+# result against the IDNA 2008 tables (RFC 5892) and the Bidi rule. Labels
+# are checked for LDH syntax only.
+optional/format/hostname.json: validation of A-label (punycode) host names / contains illegal char U+302E Hangul single dot tone mark
+optional/format/hostname.json: validation of A-label (punycode) host names / Begins with a Spacing Combining Mark
+optional/format/hostname.json: validation of A-label (punycode) host names / Begins with a Nonspacing Mark
+optional/format/hostname.json: validation of A-label (punycode) host names / Begins with an Enclosing Mark
+optional/format/hostname.json: validation of A-label (punycode) host names / Exceptions that are DISALLOWED, right-to-left chars
+optional/format/hostname.json: validation of A-label (punycode) host names / Exceptions that are DISALLOWED, left-to-right chars
+optional/format/hostname.json: validation of A-label (punycode) host names / MIDDLE DOT with no preceding 'l'
+optional/format/hostname.json: validation of A-label (punycode) host names / MIDDLE DOT with nothing preceding
+optional/format/hostname.json: validation of A-label (punycode) host names / MIDDLE DOT with no following 'l'
+optional/format/hostname.json: validation of A-label (punycode) host names / MIDDLE DOT with nothing following
+optional/format/hostname.json: validation of A-label (punycode) host names / Greek KERAIA not followed by Greek
+optional/format/hostname.json: validation of A-label (punycode) host names / Greek KERAIA not followed by anything
+optional/format/hostname.json: validation of A-label (punycode) host names / Hebrew GERESH not preceded by Hebrew
+optional/format/hostname.json: validation of A-label (punycode) host names / Hebrew GERESH not preceded by anything
+optional/format/hostname.json: validation of A-label (punycode) host names / Hebrew GERSHAYIM not preceded by Hebrew
+optional/format/hostname.json: validation of A-label (punycode) host names / Hebrew GERSHAYIM not preceded by anything
+optional/format/hostname.json: validation of A-label (punycode) host names / KATAKANA MIDDLE DOT with no Hiragana, Katakana, or Han
+optional/format/hostname.json: validation of A-label (punycode) host names / KATAKANA MIDDLE DOT with no other characters
+optional/format/hostname.json: validation of A-label (punycode) host names / Arabic-Indic digits mixed with Extended Arabic-Indic digits
+optional/format/hostname.json: validation of A-label (punycode) host names / ZERO WIDTH JOINER not preceded by Virama
+optional/format/hostname.json: validation of A-label (punycode) host names / ZERO WIDTH JOINER not preceded by anything
+optional/format/hostname.json: validation of A-label (punycode) host names / contains "--" in the 3rd and 4th position
+
+# Jennifer's regular expressions are RE2, not ECMA-262. The `regex` format
+# compiles the pattern as RE2, so syntax the two dialects disagree on is
+# judged by RE2: Python named groups and inline flags are accepted,
+# backreferences, lookbehind and empty classes are rejected.
+optional/format/ecmascript-regex.json: \a is not an ECMA 262 control escape / when used as a pattern
+optional/format/ecmascript-regex.json: Python-specific regular expression syntax is not valid ECMA 262 / Python named group (?P<name>...) is not ECMA 262
+optional/format/ecmascript-regex.json: global inline flag groups are not valid ECMA 262 / a single global inline flag (?i)
+optional/format/ecmascript-regex.json: global inline flag groups are not valid ECMA 262 / multiple global inline flags (?ims)
+optional/format/ecmascript-regex.json: ECMA 262 named groups and backreferences are valid / an ECMA 262 named backreference \k<name>
+optional/format/ecmascript-regex.json: ECMA 262 lookbehind is valid, including variable width / a variable-width lookbehind (ES2018)
+optional/format/ecmascript-regex.json: ECMA 262 character classes and escapes / an empty character class is valid ECMA 262
+optional/format/ecmascript-regex.json: ECMA 262 character classes and escapes / a negated empty character class is valid ECMA 262
