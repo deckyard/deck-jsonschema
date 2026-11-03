@@ -1,6 +1,6 @@
 [package]
 name = "@deckyard/jsonschema"
-version = "0.1.0"
+version = "0.2.0-dev"
 description = "Validate JSON values against JSON Schema (draft 2020-12)"
 license = "LGPL-3.0-only"
 authors = ["mplx <mplx@jennifer-lang.dev>"]
