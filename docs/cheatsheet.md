@@ -16,20 +16,22 @@ import "@deckyard/jsonschema/" as jsonschema;
 |---|---|---|
 | `compile(schema)` | `Schema` | Compile a schema whose references stay inside it |
 | `compileWith(schema, reg)` | `Schema` | Compile a schema whose references may reach documents in `reg` |
-| `assertFormats(s, on)` | `Schema` | The same schema with `format` asserted (`true`) or only annotated (`false`, the default) |
+| `assertFormats(s, on)` | `Schema` | The same schema with `format` asserted (`true`) or only annotated (`false`, the default); the format-assertion vocabulary overrides `false` |
 | `registry()` | `Registry` | An empty registry |
 | `register(reg, uri, schema)` | `Registry` | `reg` with `schema` added under the absolute URI `uri` |
 
 `compile` and `compileWith` throw an `Error` of kind `jsonschema` when the
-schema is not an object or a boolean, and `register` when `uri` is relative.
+schema is not an object or a boolean, when a meta-schema it reaches requires an
+unknown vocabulary, or when the format-assertion vocabulary asserts a format
+the deck does not check. `register` throws when `uri` is relative.
 
 ## Validating
 
 | Function | Returns | Does |
 |---|---|---|
 | `validate(s, instance)` | `Result` | Check a value, collecting every failure |
-| `isValid(s, instance)` | `bool` | Check a value, stopping at the first failure |
-| `describe(r)` | `string` | One line per failure: `instancePath: message [schemaPath]` |
+| `isValid(s, instance)` | `bool` | Check a value, stopping at the first failing keyword or subschema where the answer allows |
+| `describe(r)` | `string` | One line per failure: `instancePath: message [schemaPath]`, `(root)` for the empty path |
 
 Both checks throw an `Error` of kind `jsonschema` when evaluation reaches a part
 of the schema it cannot use: a `$ref` that resolves to nothing, a reference
@@ -45,8 +47,15 @@ compile.
 | `root as json.Value` | the schema document |
 | `base as string` | its base URI: its `$id`, or `DEFAULT_BASE` |
 | `registry as Registry` | every resource its references can reach |
-| `formats as bool` | whether `format` is asserted |
-| `validation as bool` | whether the validation vocabulary is in force |
+| `formats as bool` | whether `assertFormats` switched `format` assertion on everywhere |
+| `validation as bool` | whether the validation vocabulary is in force at the root |
+| `dialects as map of string to int` | resource URI to its vocabularies, for each reachable resource with a `$schema`: 1 validation, plus 2 format assertion |
+| `targets as map of string to json.Value` | `base + " " + ref` to the schema each reachable `$ref` / `$dynamicRef` resolves to |
+| `bases as map of string to string` | the same keys to that schema's base URI |
+| `patterns as map of string to string` | each reachable `pattern` and `patternProperties` name to its RE2 form |
+
+The last four are filled by `compile`; evaluation reads them instead of
+resolving references and translating patterns per value.
 
 ### `Registry`
 

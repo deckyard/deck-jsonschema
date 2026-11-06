@@ -31,4 +31,5 @@ and so does an exclusion that starts passing.
   backreferences, lookbehind and empty classes (8 cases).
 
 Formats the deck does not check (`idn-email`, `idn-hostname`, `iri`,
-`iri-reference`, `uri-template`) are not run.
+`iri-reference`, `uri-template`) are not run: under `assertFormats` they pass
+any string, and under the format-assertion vocabulary `compile` refuses them.

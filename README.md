@@ -43,8 +43,9 @@ if (not $r.valid) {
   a `Registry`, and to the embedded 2020-12 meta-schemas.
 - `format` is checked on request for the common formats; see the
   [formats guide](https://deckyard.github.io/deck-jsonschema/formats.html).
-- Patterns are RE2, Jennifer's regex dialect, with ECMA-262's `\s`, `.`, `\cX`
-  and `\uXXXX` translated; lookaround and backreferences are not available.
+- Patterns are RE2, Jennifer's regex dialect, with ECMA-262's `\s`, `\S`, `.`,
+  `\cX`, `\uXXXX` (surrogate pairs included) and `\u{...}` translated; a
+  pattern with lookaround or backreferences throws when evaluation reaches it.
 
 ## Requirements
 
