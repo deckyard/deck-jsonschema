@@ -152,8 +152,73 @@ func testAssertFormatsTogglesFormat() {
     testing.assertFalse(isValid(assertFormats($s, true), json.decode('"not an address"')));
 }
 
-func testUsesVocabularyFallsBack() {
+func testDialectFallsBack() {
     def s as Schema init compile(json.decode('{"type": "string"}'));
-    testing.assertTrue(usesVocabulary($s, VOCAB_VALIDATION, true));
-    testing.assertFalse(usesVocabulary($s, VOCAB_FORMAT_ASSERTION, false));
+    testing.assertEqual(dialect($s, $s.base, STANDARD_META, ""), DIALECT_VALIDATION);
+    testing.assertEqual(dialect($s, $s.base, "https://nowhere.test/meta", ""), DIALECT_VALIDATION);
+    testing.assertEqual(rootFlags($s), DIALECT_VALIDATION);
+    testing.assertTrue($s.validation);
+}
+
+func testRefDecodingLetsTheCallLimitThrough() {
+    for (def outcome in nearTheLimit("ref")) {
+        testing.assertTrue($outcome == "true" or $outcome == "limit");
+    }
+}
+
+func failUnknownRequiredVocabulary() {
+    def reg as Registry init register(
+        registry(),
+        "https://example.test/meta",
+        json.decode('{"$vocabulary": {"https://json-schema.org/draft/2020-12/vocab/core": true, "https://example.test/vocab/unknown": true}}'));
+    compileWith(json.decode('{"$schema": "https://example.test/meta"}'), $reg);
+}
+
+func testUnknownRequiredVocabularyIsRefused() {
+    testing.assertThrows("failUnknownRequiredVocabulary", ERROR_KIND);
+    def reg as Registry init register(
+        registry(),
+        "https://example.test/meta",
+        json.decode('{"$vocabulary": {"https://json-schema.org/draft/2020-12/vocab/validation": true, "https://example.test/vocab/unknown": false}}'));
+    def s as Schema init compileWith(
+        json.decode('{"$schema": "https://example.test/meta", "type": "string"}'),
+        $reg);
+    testing.assertFalse(isValid($s, json.decode("1")));
+}
+
+func testVocabulariesArePerResource() {
+    def reg as Registry init register(
+        registry(),
+        "https://example.test/novalid",
+        json.decode('{"$vocabulary": {"https://json-schema.org/draft/2020-12/vocab/core": true, "https://json-schema.org/draft/2020-12/vocab/applicator": true}}'));
+    $reg = register(
+        $reg,
+        "https://example.test/int",
+        json.decode('{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "integer"}'));
+    def s as Schema init compileWith(
+        json.decode('{"$schema": "https://example.test/novalid", "$ref": "https://example.test/int", "minimum": 5}'),
+        $reg);
+    testing.assertFalse($s.validation);
+    testing.assertFalse(isValid($s, json.decode('"x"')));
+    testing.assertTrue(isValid($s, json.decode("1")));
+    def nested as Schema init compileWith(
+        json.decode('{"$schema": "https://example.test/novalid", "properties": {"a": {"$id": "https://example.test/a", "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "integer"}}, "type": "object"}'),
+        $reg);
+    testing.assertFalse(isValid($nested, json.decode('{"a": "x"}')));
+    testing.assertTrue(isValid($nested, json.decode("3")));
+}
+
+func testCompileResolvesAhead() {
+    def s as Schema init compile(json.decode('{"$defs": {"n": {"pattern": "a.b", "patternProperties": {"^x": true}}}, "$ref": "#/$defs/n"}'));
+    testing.assertTrue(maps.has($s.targets, DEFAULT_BASE + " #/$defs/n"));
+    testing.assertEqual($s.bases[DEFAULT_BASE + " #/$defs/n"], DEFAULT_BASE);
+    testing.assertEqual($s.patterns["^x"], "^x");
+    testing.assertTrue(strings.startsWith($s.patterns["a.b"], "a[^"));
+    def meta as Schema init compile(json.decode('{"$ref": "https://json-schema.org/draft/2020-12/schema"}'));
+    testing.assertTrue(maps.has(
+        $meta.targets,
+        "https://json-schema.org/draft/2020-12/schema meta/core"));
+    testing.assertTrue(maps.has(
+        $meta.targets,
+        "https://json-schema.org/draft/2020-12/meta/core #meta"));
 }

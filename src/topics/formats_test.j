@@ -133,3 +133,51 @@ func testPointersUuidsAndRegexes() {
     testing.assertTrue(isRegex("^[a-z]+$"));
     testing.assertFalse(isRegex("(unclosed"));
 }
+
+func testRegexFormatLetsTheCallLimitThrough() {
+    for (def outcome in nearTheLimit("regex")) {
+        testing.assertTrue($outcome == "true" or $outcome == "limit");
+    }
+}
+
+# A registry with a meta-schema that lists the format-assertion vocabulary.
+def const FORMAT_VOCAB as Registry init register(
+    registry(),
+    "https://example.test/format-meta",
+    json.decode('{"$vocabulary": {"https://json-schema.org/draft/2020-12/vocab/core": true, "https://json-schema.org/draft/2020-12/vocab/format-assertion": true}}'));
+
+/**
+ * Compile `{"format": name}` under the format-assertion vocabulary.
+ *
+ * @param name {string} the format
+ * @return {Schema} the compiled schema
+ */
+func formatVocabSchema(name as string) {
+    return compileWith(
+        json.decode('{"$schema": "https://example.test/format-meta", "format": "' + $name + '"}'),
+        FORMAT_VOCAB);
+}
+
+func failUncheckedFormatUnderTheVocabulary() {
+    formatVocabSchema("idn-hostname");
+}
+
+func testFormatVocabularyRefusesUncheckedFormats() {
+    testing.assertThrows("failUncheckedFormatUnderTheVocabulary", ERROR_KIND);
+}
+
+func testFormatVocabularyFailsUnknownFormats() {
+    def s as Schema init formatVocabSchema("made-up-format");
+    testing.assertFalse(isValid($s, json.decode('"x"')));
+    testing.assertEqual(
+        validate($s, json.decode("1")).errors[0].message,
+        'format "made-up-format" is unknown');
+    testing.assertFalse(isValid(formatVocabSchema("ipv4"), json.decode('"-bad-."')));
+    testing.assertFalse(isValid(
+        assertFormats(formatVocabSchema("ipv4"), false),
+        json.decode('"-bad-."')));
+    testing.assertFalse(formatVocabSchema("ipv4").formats);
+    testing.assertTrue(isValid(
+        assertFormats(compile(json.decode('{"format": "made-up-format"}')), true),
+        json.decode('"x"')));
+}

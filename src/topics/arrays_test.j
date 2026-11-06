@@ -73,3 +73,27 @@ func testUniqueItemsGroupsEqualValues() {
     }
     testing.assertTrue(isValid($s, json.decode("[" + strings.join($big, ",") + "]")));
 }
+
+func testItemAnnotationsStayWithTheItem() {
+    def s as Schema init compile(json.decode('{"prefixItems": [{"contains": true}], "unevaluatedItems": false}'));
+    testing.assertFalse(isValid($s, json.decode("[[1, 1], 2]")));
+    testing.assertFalse(validate($s, json.decode("[[1, 1], 2]")).valid);
+    testing.assertTrue(isValid($s, json.decode("[[1, 1]]")));
+}
+
+func testUniqueItemsKeysIntegersExactly() {
+    testing.assertNotEqual(
+        sameKey(json.decode("4611686018427387904")),
+        sameKey(json.decode("4611686018427387905")));
+    testing.assertEqual(sameKey(json.decode("3")), sameKey(json.decode("3.0")));
+    testing.assertEqual(sameKey(json.decode("-0.0")), sameKey(json.decode("0")));
+    def s as Schema init compile(json.decode('{"uniqueItems": true}'));
+    testing.assertTrue(isValid($s, json.decode("[9007199254740993, 9007199254740992.0]")));
+    testing.assertFalse(isValid($s, json.decode("[1e2, 100]")));
+    testing.assertTrue(isValid($s, json.decode("[0.1, 0.30000000000000004, 0.3]")));
+    def big as list of string init [];
+    for (def i in 0..5000) {
+        $big[] = convert.toString(4611686018427387904 + $i);
+    }
+    testing.assertTrue(isValid($s, json.decode("[" + strings.join($big, ",") + "]")));
+}

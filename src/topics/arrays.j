@@ -48,13 +48,16 @@ func arrayKeyword(s as Schema, node as json.Value, here as Here, inst as json.Va
 /**
  * Evaluate one item against a subschema.
  *
+ * The item's own annotations describe the item, not the array, so a passing
+ * outcome comes back without them; the caller annotates the index.
+ *
  * @param s {Schema} the compiled schema
  * @param sub {json.Value} the subschema
  * @param here {Here} the array's position
  * @param step {string} the escaped pointer from the schema object to `sub`
  * @param inst {json.Value} the array
  * @param i {int} the item's index
- * @return {Outcome} the item's outcome
+ * @return {Outcome} the item's outcome, without annotations
  */
 func item(
     s as Schema,
@@ -64,7 +67,15 @@ func item(
     inst as json.Value,
     i as int) {
     def at as string init "/" + convert.toString($i);
-    return evaluate($s, $sub, into($here, $sub, $step, $at), json.get($inst, $at));
+    def o as Outcome init evaluate(
+        $s,
+        $sub,
+        into($s, $here, $sub, $step, $at),
+        json.get($inst, $at));
+    if ($o.valid) {
+        return pass();
+    }
+    return $o;
 }
 
 /**
@@ -167,8 +178,8 @@ func containsKeyword(s as Schema, node as json.Value, here as Here, inst as json
 /**
  * `uniqueItems`: no two items may be equal, by JSON Schema's equality.
  *
- * Items are grouped by `sameKey`, so only items in one group are compared:
- * linear time rather than quadratic.
+ * Each item is keyed by `sameKey`, which is equal exactly for equal items,
+ * so one map lookup per item finds a duplicate: linear in the array's size.
  *
  * @param node {json.Value} the schema object
  * @param here {Here} its position
@@ -182,40 +193,37 @@ func uniqueItems(node as json.Value, here as Here, inst as json.Value) {
     if (not json.asBool($node, "/uniqueItems")) {
         return pass();
     }
-    def groups as map of string to list of int init {};
+    def first as map of string to int init {};
     for (def i in 0..json.length($inst)) {
-        def a as json.Value init json.get($inst, "/" + convert.toString($i));
-        def key as string init sameKey($a);
-        if (not maps.has($groups, $key)) {
-            $groups[$key] = [$i];
-            continue;
+        def key as string init sameKey(json.get($inst, "/" + convert.toString($i)));
+        if (maps.has($first, $key)) {
+            def which as string init convert.toString($first[$key]) + " and " + convert.toString($i);
+            return fail($here, "uniqueItems", "items " + $which + " are equal");
         }
-        for (def j in $groups[$key]) {
-            if (json.get($inst, "/" + convert.toString($j)) == $a) {
-                def which as string init convert.toString($j) + " and " + convert.toString($i);
-                return fail($here, "uniqueItems", "items " + $which + " are equal");
-            }
-        }
-        def group as list of int init $groups[$key];
-        $group[] = $i;
-        $groups[$key] = $group;
+        $first[$key] = $i;
     }
     return pass();
 }
 
 /**
- * A text that is the same for any two values JSON Schema calls equal:
- * numbers by their float value, objects with their keys sorted.
- *
- * Different values may share one, so a match still needs `==`.
+ * A text that is the same for two values exactly when JSON Schema calls
+ * them equal: an integer, and a whole float that fits an int, by its digits;
+ * any other float by its shortest round-trip text; objects with their keys
+ * sorted. Each kind starts with its own character, so no two kinds collide.
  *
  * @param v {json.Value} the value
  * @return {string} its key
  */
 func sameKey(v as json.Value) {
     match (json.typeOf($v)) {
-        when "int" { return "n" + convert.toString(json.asFloat($v)); }
-        when "float" { return "n" + convert.toString(json.asFloat($v)); }
+        when "int" { return "n" + convert.toString(json.asInt($v)); }
+        when "float" {
+            def f as float init json.asFloat($v);
+            if (fitsInt($f)) {
+                return "n" + convert.toString(convert.toInt($f));
+            }
+            return "n" + convert.toString($f);
+        }
         when "list" {
             def parts as list of string init [];
             for (def i in 0..json.length($v)) {

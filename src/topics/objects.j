@@ -72,7 +72,11 @@ func property(
     inst as json.Value,
     name as string) {
     def at as string init childPointer("", $name);
-    def o as Outcome init evaluate($s, $sub, into($here, $sub, $step, $at), json.get($inst, $at));
+    def o as Outcome init evaluate(
+        $s,
+        $sub,
+        into($s, $here, $sub, $step, $at),
+        json.get($inst, $at));
     if ($o.valid) {
         $o.props = {};
         $o.props[$name] = true;
@@ -85,6 +89,10 @@ func property(
 /**
  * `properties`: each listed property that is present must pass its schema.
  *
+ * Walks whichever is smaller, the listed names or the object's, so a large
+ * schema costs nothing extra against a small object. Failures come in the
+ * order of the side walked.
+ *
  * @param s {Schema} the compiled schema
  * @param node {json.Value} the schema object
  * @param here {Here} its position
@@ -95,10 +103,21 @@ func properties(s as Schema, node as json.Value, here as Here, inst as json.Valu
     if (kindAt($node, "/properties") != "map") {
         badSchema($here, "properties must be an object");
     }
+    def fromInstance as bool init json.length($inst) < json.length($node, "/properties");
+    def names as list of string init [];
+    if ($fromInstance) {
+        $names = json.keys($inst);
+    } else {
+        $names = json.keys($node, "/properties");
+    }
     def acc as Outcome init pass();
-    for (def name in json.keys($node, "/properties")) {
+    for (def name in $names) {
         def step as string init childPointer("/properties", $name);
-        if (not json.has($inst, childPointer("", $name))) {
+        if ($fromInstance) {
+            if (not json.has($node, $step)) {
+                continue;
+            }
+        } elseif (not json.has($inst, childPointer("", $name))) {
             continue;
         }
         $acc = merge($acc, property($s, json.get($node, $step), $here, $step, $inst, $name));
@@ -127,7 +146,7 @@ func patternProperties(s as Schema, node as json.Value, here as Here, inst as js
     for (def pattern in json.keys($node, "/patternProperties")) {
         def step as string init childPointer("/patternProperties", $pattern);
         for (def name in json.keys($inst)) {
-            if (not patternMatches($here, $pattern, $name)) {
+            if (not patternMatches($s, $here, $pattern, $name)) {
                 continue;
             }
             $acc = merge($acc, property($s, json.get($node, $step), $here, $step, $inst, $name));
@@ -143,12 +162,13 @@ func patternProperties(s as Schema, node as json.Value, here as Here, inst as js
  * Whether `properties` or `patternProperties` of the same schema object
  * covers a property name.
  *
+ * @param s {Schema} the compiled schema
  * @param node {json.Value} the schema object
  * @param here {Here} its position
  * @param name {string} the property
  * @return {bool} whether one of them applies to it
  */
-func covered(node as json.Value, here as Here, name as string) {
+func covered(s as Schema, node as json.Value, here as Here, name as string) {
     if (kindAt($node, "/properties") == "map") {
         if (json.has($node, childPointer("/properties", $name))) {
             return true;
@@ -158,7 +178,7 @@ func covered(node as json.Value, here as Here, name as string) {
         return false;
     }
     for (def pattern in json.keys($node, "/patternProperties")) {
-        if (patternMatches($here, $pattern, $name)) {
+        if (patternMatches($s, $here, $pattern, $name)) {
             return true;
         }
     }
@@ -179,7 +199,7 @@ func additionalProperties(s as Schema, node as json.Value, here as Here, inst as
     def sub as json.Value init json.get($node, "/additionalProperties");
     def acc as Outcome init pass();
     for (def name in json.keys($inst)) {
-        if (covered($node, $here, $name)) {
+        if (covered($s, $node, $here, $name)) {
             continue;
         }
         def o as Outcome init property($s, $sub, $here, "/additionalProperties", $inst, $name);
@@ -209,7 +229,7 @@ func additionalProperties(s as Schema, node as json.Value, here as Here, inst as
 func propertyNames(s as Schema, node as json.Value, here as Here, inst as json.Value) {
     def sub as json.Value init json.get($node, "/propertyNames");
     for (def name in json.keys($inst)) {
-        def at as Here init into($here, $sub, "/propertyNames", childPointer("", $name));
+        def at as Here init into($s, $here, $sub, "/propertyNames", childPointer("", $name));
         if (not evaluate($s, $sub, $at, json.decode(json.encode($name))).valid) {
             return fail(
                 $here,
@@ -233,7 +253,7 @@ func required(node as json.Value, here as Here, inst as json.Value) {
     if (len($missing) == 0) {
         return pass();
     }
-    return fail($here, "required", "missing required properties: " + strings.join($missing, ", "));
+    return fail($here, "required", "missing required properties: " + quotedList($missing));
 }
 
 /**
@@ -302,7 +322,7 @@ func dependentRequired(node as json.Value, here as Here, inst as json.Value) {
             return fail(
                 $here,
                 "dependentRequired",
-                $name + " requires " + strings.join($missing, ", "));
+                quoted($name) + " requires " + quotedList($missing));
         }
     }
     return pass();
@@ -327,7 +347,7 @@ func dependentSchemas(s as Schema, node as json.Value, here as Here, inst as jso
         }
         def step as string init childPointer("/dependentSchemas", $name);
         def sub as json.Value init json.get($node, $step);
-        $acc = merge($acc, evaluate($s, $sub, into($here, $sub, $step, ""), $inst));
+        $acc = merge($acc, evaluate($s, $sub, into($s, $here, $sub, $step, ""), $inst));
         if ($here.fast and not $acc.valid) {
             return $acc;
         }
@@ -363,12 +383,12 @@ func dependencies(s as Schema, node as json.Value, here as Here, inst as json.Va
                     fail(
                         $here,
                         "dependencies",
-                        $name + " requires " + strings.join($missing, ", ")));
+                        quoted($name) + " requires " + quotedList($missing)));
             }
             continue;
         }
         def sub as json.Value init json.get($node, $step);
-        $acc = merge($acc, evaluate($s, $sub, into($here, $sub, $step, ""), $inst));
+        $acc = merge($acc, evaluate($s, $sub, into($s, $here, $sub, $step, ""), $inst));
     }
     return $acc;
 }

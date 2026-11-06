@@ -138,16 +138,17 @@ func testDescribeKeepsOneLinePerFailure() {
 }
 
 func testIntoAppliesIds() {
-    def here as Here init start(compile(json.decode("true")), false);
+    def s as Schema init compile(json.decode("true"));
     def next as Here init into(
-        $here,
+        $s,
+        start($s, false),
         json.decode('{"$id": "https://x.test/s.json"}'),
         "/items",
         "/0");
     testing.assertEqual($next.base, "https://x.test/s.json");
     testing.assertEqual($next.schemaPath, "/items");
     testing.assertEqual($next.instancePath, "/0");
-    testing.assertEqual(len($next.scope), 2);
+    testing.assertEqual($next.scope, DEFAULT_BASE + "\nhttps://x.test/s.json\n");
 }
 
 func testOneOfNamesTheMatches() {

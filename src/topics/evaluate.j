@@ -16,46 +16,52 @@ def const MAX_DEPTH as int init 200;
 # instance nested several hundred levels deep does.
 def const TOO_DEEP as string init "the instance is nested too deeply to evaluate";
 
-# Keywords the dispatcher passes over: annotations, keywords another keyword
-# reads (`then` is read by `if`, `minContains` by `contains`), and the two
-# `unevaluated*` keywords, which `evaluate` runs last.
-def const SKIPPED as map of string to bool init {
-    "$schema": true,
-    "$id": true,
-    "$anchor": true,
-    "$dynamicAnchor": true,
-    "$vocabulary": true,
-    "$comment": true,
-    "$defs": true,
-    "title": true,
-    "description": true,
-    "default": true,
-    "examples": true,
-    "deprecated": true,
-    "readOnly": true,
-    "writeOnly": true,
-    "then": true,
-    "else": true,
-    "minContains": true,
-    "maxContains": true,
-    "unevaluatedProperties": true,
-    "unevaluatedItems": true
-};
-
-# Keywords `valueKeyword` owns, whatever the instance type.
-def const VALUE_KEYWORDS as map of string to bool init {
-    "type": true,
-    "enum": true,
-    "const": true,
-    "format": true,
-    "multipleOf": true,
-    "minimum": true,
-    "maximum": true,
-    "exclusiveMinimum": true,
-    "exclusiveMaximum": true,
-    "minLength": true,
-    "maxLength": true,
-    "pattern": true
+# The keywords the dispatcher runs, by kind: those that apply in place to
+# any value, the single-value keywords of `valueKeyword`, and those that act
+# only on an object or only on an array. Anything else is passed over:
+# annotations, unknown keywords, keywords another keyword reads (`then` is
+# read by `if`, `minContains` by `contains`), and the two `unevaluated*`
+# keywords, which `evaluate` runs last.
+def const IN_PLACE as int init 1;
+def const ON_VALUE as int init 2;
+def const ON_OBJECT as int init 3;
+def const ON_ARRAY as int init 4;
+def const KEYWORDS as map of string to int init {
+    "$ref": IN_PLACE,
+    "$dynamicRef": IN_PLACE,
+    "allOf": IN_PLACE,
+    "anyOf": IN_PLACE,
+    "oneOf": IN_PLACE,
+    "not": IN_PLACE,
+    "if": IN_PLACE,
+    "type": ON_VALUE,
+    "enum": ON_VALUE,
+    "const": ON_VALUE,
+    "format": ON_VALUE,
+    "multipleOf": ON_VALUE,
+    "minimum": ON_VALUE,
+    "maximum": ON_VALUE,
+    "exclusiveMinimum": ON_VALUE,
+    "exclusiveMaximum": ON_VALUE,
+    "minLength": ON_VALUE,
+    "maxLength": ON_VALUE,
+    "pattern": ON_VALUE,
+    "properties": ON_OBJECT,
+    "patternProperties": ON_OBJECT,
+    "additionalProperties": ON_OBJECT,
+    "propertyNames": ON_OBJECT,
+    "dependentSchemas": ON_OBJECT,
+    "required": ON_OBJECT,
+    "dependentRequired": ON_OBJECT,
+    "dependencies": ON_OBJECT,
+    "minProperties": ON_OBJECT,
+    "maxProperties": ON_OBJECT,
+    "prefixItems": ON_ARRAY,
+    "items": ON_ARRAY,
+    "contains": ON_ARRAY,
+    "uniqueItems": ON_ARRAY,
+    "minItems": ON_ARRAY,
+    "maxItems": ON_ARRAY
 };
 
 /**
@@ -82,8 +88,11 @@ export func validate(s as Schema, instance as json.Value) {
 }
 
 /**
- * Whether a value satisfies a compiled schema. Stops at the first failure,
- * so it is quicker than `validate` on an invalid value.
+ * Whether a value satisfies a compiled schema. Stops at the first failing
+ * keyword of a schema object and at the first failing subschema of `allOf`,
+ * `properties`, `items` and the like, so it is quicker than `validate` on an
+ * invalid value. `anyOf`, `oneOf`, `contains` and `if` still evaluate every
+ * branch or item.
  *
  * @param s {Schema} the compiled schema
  * @param instance {json.Value} the value to check
@@ -136,33 +145,67 @@ export func describe(r as Result) {
  * @return {Here} the root position
  */
 func start(s as Schema, fast as bool) {
+    def flags as int init rootFlags($s);
     return Here{
         base: $s.base,
         schemaPath: "",
         instancePath: "",
-        scope: [$s.base],
+        scope: $s.base + "\n",
         depth: 0,
         refAt: "",
-        fast: $fast
+        fast: $fast,
+        validation: ($flags & DIALECT_VALIDATION) != 0,
+        strict: ($flags & DIALECT_FORMATS) != 0
     };
+}
+
+/**
+ * A position moved into another schema resource: the base changed, the
+ * resource added to the dynamic scope, and its vocabularies in force when
+ * it has a `$schema` (otherwise those in force stay).
+ *
+ * Changes and returns `here`, so `$next = enter($s, $next, ...)` costs no copy.
+ *
+ * @param s {Schema} the compiled schema
+ * @param here {Here} the position
+ * @param base {string} the resource's base URI
+ * @return {Here} the position in the resource
+ */
+func enter(s as Schema, here as Here, base as string) {
+    $here.base = $base;
+    $here.scope = $here.scope + $base + "\n";
+    if (maps.has($s.dialects, $base)) {
+        def flags as int init $s.dialects[$base];
+        $here.validation = ($flags & DIALECT_VALIDATION) != 0;
+        $here.strict = ($flags & DIALECT_FORMATS) != 0;
+    }
+    return $here;
 }
 
 /**
  * The position for a subschema under the current one.
  *
+ * @param s {Schema} the compiled schema
  * @param here {Here} the current position
  * @param node {json.Value} the subschema
  * @param schemaStep {string} the escaped pointer from here to the subschema
  * @param instanceStep {string} the escaped pointer from the current value, or `""`
- * @return {Here} the subschema's position, its base and scope adjusted for any `$id`
+ * @return {Here} the subschema's position, adjusted for any `$id`
  */
-func into(here as Here, node as json.Value, schemaStep as string, instanceStep as string) {
+func into(
+    s as Schema,
+    here as Here,
+    node as json.Value,
+    schemaStep as string,
+    instanceStep as string) {
     def next as Here init $here;
     $next.schemaPath = $here.schemaPath + $schemaStep;
     $next.instancePath = $here.instancePath + $instanceStep;
     if (kindAt($node, "/$id") == "string") {
-        $next.base = stripFragment(uri.resolve($here.base, json.asString($node, "/$id")));
-        $next.scope[] = $next.base;
+        $next = enter(
+            $s,
+            $next,
+            stripFragment(uri.resolve($here.base, json.asString($node, "/$id"))));
     }
     return $next;
 }
@@ -189,11 +232,16 @@ func evaluate(s as Schema, node as json.Value, here as Here, inst as json.Value)
         else { badSchema($here, "a schema is an object or a boolean"); }
     }
     def acc as Outcome init pass();
+    def kind as string init json.typeOf($inst);
     for (def k in json.keys($node)) {
-        if (maps.has(SKIPPED, $k)) {
+        if (not maps.has(KEYWORDS, $k)) {
             continue;
         }
-        def part as Outcome init keyword($s, $node, $here, $inst, $k);
+        def on as int init KEYWORDS[$k];
+        if (($on == ON_OBJECT and $kind != "map") or ($on == ON_ARRAY and $kind != "list")) {
+            continue;
+        }
+        def part as Outcome init keyword($s, $node, $here, $inst, $k, $on);
         $acc = merge($acc, $part);
         if ($here.fast and not $acc.valid) {
             return $acc;
@@ -220,11 +268,20 @@ func evaluate(s as Schema, node as json.Value, here as Here, inst as json.Value)
  * @param s {Schema} the compiled schema
  * @param node {json.Value} the schema object
  * @param here {Here} its position
- * @param inst {json.Value} the value
+ * @param inst {json.Value} the value, of a type the keyword acts on
  * @param k {string} the keyword
- * @return {Outcome} the keyword's outcome; a pass for one it does not act on
+ * @param on {int} its kind in `KEYWORDS`
+ * @return {Outcome} the keyword's outcome
  */
-func keyword(s as Schema, node as json.Value, here as Here, inst as json.Value, k as string) {
+func keyword(
+    s as Schema,
+    node as json.Value,
+    here as Here,
+    inst as json.Value,
+    k as string,
+    on as int) {
+    # One match, not one inside an `if`: the call-depth budget counts blocks,
+    # and this sits on every level of a recursive schema.
     match ($k) {
         when "$ref" { return reference($s, $node, $here, $inst, false); }
         when "$dynamicRef" { return reference($s, $node, $here, $inst, true); }
@@ -236,16 +293,13 @@ func keyword(s as Schema, node as json.Value, here as Here, inst as json.Value, 
         else {
         }
     }
-    if (not $s.validation and lists.contains(VALIDATION_KEYWORDS, $k)) {
+    if (not $here.validation and lists.contains(VALIDATION_KEYWORDS, $k)) {
         return pass();
     }
-    if (maps.has(VALUE_KEYWORDS, $k)) {
-        return valueKeyword($s, $node, $here, $inst, $k);
-    }
-    match (json.typeOf($inst)) {
-        when "map" { return objectKeyword($s, $node, $here, $inst, $k); }
-        when "list" { return arrayKeyword($s, $node, $here, $inst, $k); }
-        else { return pass(); }
+    match ($on) {
+        when ON_VALUE { return valueKeyword($s, $node, $here, $inst, $k); }
+        when ON_OBJECT { return objectKeyword($s, $node, $here, $inst, $k); }
+        else { return arrayKeyword($s, $node, $here, $inst, $k); }
     }
 }
 
@@ -298,7 +352,7 @@ func reference(s as Schema, node as json.Value, here as Here, inst as json.Value
         badSchema($here, $k + " must be a string");
     }
     def ref as string init json.asString($node, "/" + $k);
-    def t as Target init resolveRef($s, $here.base, $ref);
+    def t as Target init target($s, $here.base, $ref);
     if ($t.location == "") {
         badSchema($here, "cannot resolve " + $k + " " + $ref);
     }
@@ -314,12 +368,28 @@ func reference(s as Schema, node as json.Value, here as Here, inst as json.Value
         badSchema($here, $k + " " + $ref + " recurses without end");
     }
     $next.schemaPath = $here.schemaPath + "/" + escapeToken($k);
-    $next.base = $t.base;
     $next.depth = $next.depth + 1;
-    if (lists.last($next.scope) != $t.base) {
-        $next.scope[] = $t.base;
+    if ($t.base != $here.base) {
+        $next = enter($s, $next, $t.base);
     }
     return evaluate($s, $t.node, $next, $inst);
+}
+
+/**
+ * Where a reference leads: from what `compile` resolved, or resolved now.
+ *
+ * @param s {Schema} the compiled schema
+ * @param base {string} the base URI the reference appears under
+ * @param ref {string} the reference
+ * @return {Target} the target; `location` is `""` when nothing matches
+ */
+func target(s as Schema, base as string, ref as string) {
+    def key as string init $base + " " + $ref;
+    if (maps.has($s.targets, $key)) {
+        def at as string init $s.bases[$key];
+        return Target{node: $s.targets[$key], base: $at, location: $at + "#" + fragmentOf($ref)};
+    }
+    return resolveRef($s, $base, $ref);
 }
 
 /**
@@ -340,9 +410,9 @@ func dynamicTarget(s as Schema, here as Here, first as Target) {
     if (not maps.has($s.registry.dynamic, stripFragment($first.location) + "#" + $name)) {
         return $first;
     }
-    for (def resource in $here.scope) {
+    for (def resource in strings.split($here.scope, "\n")) {
         if (maps.has($s.registry.dynamic, $resource + "#" + $name)) {
-            return resolveRef($s, $resource, "#" + $name);
+            return target($s, $resource, "#" + $name);
         }
     }
     return $first;
@@ -384,7 +454,7 @@ func branch(
     i as int) {
     def step as string init "/" + $k + "/" + convert.toString($i);
     def sub as json.Value init json.get($node, $step);
-    return evaluate($s, $sub, into($here, $sub, $step, ""), $inst);
+    return evaluate($s, $sub, into($s, $here, $sub, $step, ""), $inst);
 }
 
 /**
@@ -489,7 +559,7 @@ func oneOf(s as Schema, node as json.Value, here as Here, inst as json.Value) {
  */
 func notKeyword(s as Schema, node as json.Value, here as Here, inst as json.Value) {
     def sub as json.Value init json.get($node, "/not");
-    def inner as Here init into($here, $sub, "/not", "");
+    def inner as Here init into($s, $here, $sub, "/not", "");
     $inner.fast = true;
     if (evaluate($s, $sub, $inner, $inst).valid) {
         return fail($here, "not", "matches the schema under not");
@@ -508,7 +578,7 @@ func notKeyword(s as Schema, node as json.Value, here as Here, inst as json.Valu
  */
 func ifThenElse(s as Schema, node as json.Value, here as Here, inst as json.Value) {
     def cond as json.Value init json.get($node, "/if");
-    def test as Here init into($here, $cond, "/if", "");
+    def test as Here init into($s, $here, $cond, "/if", "");
     $test.fast = false;
     def o as Outcome init evaluate($s, $cond, $test, $inst);
     def next as string init "/else";
@@ -521,5 +591,5 @@ func ifThenElse(s as Schema, node as json.Value, here as Here, inst as json.Valu
         return $acc;
     }
     def sub as json.Value init json.get($node, $next);
-    return merge($acc, evaluate($s, $sub, into($here, $sub, $next, ""), $inst));
+    return merge($acc, evaluate($s, $sub, into($s, $here, $sub, $next, ""), $inst));
 }

@@ -208,10 +208,12 @@ func testFailRecordsWhereAndWhat() {
         base: DEFAULT_BASE,
         schemaPath: "/properties/a",
         instancePath: "/a",
-        scope: [],
+        scope: "",
         depth: 0,
         refAt: "",
-        fast: false
+        fast: false,
+        validation: true,
+        strict: false
     };
     def o as Outcome init fail($here, "minimum", "too small");
     testing.assertFalse($o.valid);
@@ -230,4 +232,74 @@ func testBadSchemaThrows() {
 
 func testSuiteBooleanSchema() {
     assertSuite("boolean_schema.json");
+}
+
+/**
+ * Run a check under `n` extra calls, reporting how it ended.
+ *
+ * @param n {int} how many calls deep to start it
+ * @param check {string} `regex` (`isRegex`), `pattern` (`patternMatches`) or `ref` (`resolveRef` with a percent-encoded pointer)
+ * @return {string} `true`, `false`, or the kind of the error it threw
+ */
+func atDepth(n as int, check as string) {
+    try {
+        if (descend($n, $check)) {
+            return "true";
+        }
+        return "false";
+    } catch (e) {
+        return $e.kind;
+    }
+}
+
+/**
+ * Recurse `n` calls, then run a check.
+ *
+ * @param n {int} how many calls deep to go
+ * @param check {string} as for `atDepth`
+ * @return {bool} the check's answer
+ */
+func descend(n as int, check as string) {
+    if ($n > 0) {
+        return descend($n - 1, $check);
+    }
+    match ($check) {
+        when "regex" { return isRegex("a.b"); }
+        when "pattern" {
+            return patternMatches(DEPTH_SCHEMA, start(DEPTH_SCHEMA, false), PATTERN_AT_DEPTH, "A");
+        }
+        else { return resolveRef(DEPTH_SCHEMA, DEFAULT_BASE, "#/$defs/a%20b").location != ""; }
+    }
+}
+
+# The pattern `descend` checks: `escapeCode` takes its loop, the deepest
+# point of the rewrite.
+def const PATTERN_AT_DEPTH as string init '^\u0041$';
+
+# The schema `descend` checks against.
+def const DEPTH_SCHEMA as Schema init compile(json.decode('{"$defs": {"a b": true}}'));
+
+/**
+ * How a check ends in the calls around the depth where Jennifer's call
+ * limit first stops it.
+ *
+ * @param check {string} as for `atDepth`
+ * @return {list of string} the outcomes at ten depths from that point
+ */
+func nearTheLimit(check as string) {
+    def lo as int init 0;
+    def hi as int init 20000;
+    while ($lo < $hi) {
+        def mid as int init ($lo + $hi) // 2;
+        if (atDepth($mid, $check) == "true") {
+            $lo = $mid + 1;
+        } else {
+            $hi = $mid;
+        }
+    }
+    def out as list of string init [];
+    for (def n in $lo - 2..$lo + 8) {
+        $out[] = atDepth($n, $check);
+    }
+    return $out;
 }

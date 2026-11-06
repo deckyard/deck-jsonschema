@@ -79,15 +79,16 @@ func testRequiredListsWhatIsMissing() {
     def s as Schema init compile(json.decode('{"required": ["a", "b", "c"]}'));
     testing.assertEqual(
         validate($s, json.decode('{"b": 1}')).errors[0].message,
-        "missing required properties: a, c");
+        'missing required properties: "a", "c"');
 }
 
 func testCoveredSeesBothKeywords() {
     def node as json.Value init json.decode('{"properties": {"a": true}, "patternProperties": {"^x": true}}');
-    def here as Here init start(compile(json.decode("true")), false);
-    testing.assertTrue(covered($node, $here, "a"));
-    testing.assertTrue(covered($node, $here, "xy"));
-    testing.assertFalse(covered($node, $here, "b"));
+    def s as Schema init compile(json.decode("true"));
+    def here as Here init start($s, false);
+    testing.assertTrue(covered($s, $node, $here, "a"));
+    testing.assertTrue(covered($s, $node, $here, "xy"));
+    testing.assertFalse(covered($s, $node, $here, "b"));
 }
 
 func testDependenciesKeywordBothForms() {
@@ -95,4 +96,36 @@ func testDependenciesKeywordBothForms() {
     testing.assertFalse(isValid($s, json.decode('{"a": 1}')));
     testing.assertFalse(isValid($s, json.decode('{"c": 1}')));
     testing.assertTrue(isValid($s, json.decode('{"a": 1, "b": 2, "c": 3, "d": 4}')));
+}
+
+func testMessagesQuoteAndShortenNames() {
+    def long as string init strings.repeat("k", 1000);
+    def inst as json.Value init json.decode('{"' + $long + '": 1, "a\nb": 2}');
+    for (def schema in [
+        '{"additionalProperties": false}',
+        '{"propertyNames": {"maxLength": 3}}',
+        '{"unevaluatedProperties": false}'
+    ]) {
+        def r as Result init validate(compile(json.decode($schema)), $inst);
+        testing.assertFalse($r.valid);
+        for (def e in $r.errors) {
+            testing.assertTrue(len($e.message) < 100);
+            testing.assertFalse(strings.contains($e.message, "\n"));
+        }
+    }
+    def dep as Result init validate(
+        compile(json.decode('{"dependentRequired": {"a\nb": ["c d"]}}')),
+        $inst);
+    testing.assertEqual($dep.errors[0].message, '"a\nb" requires "c d"');
+    testing.assertEqual(
+        validate(compile(json.decode('{"dependencies": {"a\nb": ["c"]}}')), $inst).errors[0].message,
+        '"a\nb" requires "c"');
+}
+
+func testPropertiesWalksTheSmallerSide() {
+    def s as Schema init compile(json.decode('{"properties": {"a": {"type": "string"}, "b": true, "c": true}}'));
+    testing.assertFalse(isValid($s, json.decode('{"a": 1}')));
+    testing.assertTrue(isValid($s, json.decode('{"a": "x", "z": 1}')));
+    def small as Schema init compile(json.decode('{"properties": {"a": {"type": "string"}}}'));
+    testing.assertFalse(isValid($small, json.decode('{"x": 1, "y": 2, "a": 3}')));
 }

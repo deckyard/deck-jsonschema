@@ -41,22 +41,29 @@ export def struct Result {
 /**
  * Where evaluation stands while it walks a schema and an instance together.
  *
+ * Only strings, ints and bools, so the copy each step into a subschema makes
+ * is cheap: the dynamic scope is one string, not a list.
+ *
  * @field base {string} the base URI of the schema resource in effect
  * @field schemaPath {string} the keyword location so far
  * @field instancePath {string} the instance location so far
- * @field scope {list of string} the dynamic scope: resource URIs entered, outermost first
+ * @field scope {string} the dynamic scope: resource URIs entered, outermost first, each ended by a newline
  * @field depth {int} how many `$ref`s in a row were followed at `refAt`, to stop a cycle
  * @field refAt {string} the instance location `depth` counts at
  * @field fast {bool} whether to stop at the first error
+ * @field validation {bool} whether the validation vocabulary is in force in this resource
+ * @field strict {bool} whether the format-assertion vocabulary is in force in this resource
  */
 def struct Here {
     base as string,
     schemaPath as string,
     instancePath as string,
-    scope as list of string,
+    scope as string,
     depth as int,
     refAt as string,
-    fast as bool
+    fast as bool,
+    validation as bool,
+    strict as bool
 };
 
 /**
@@ -79,13 +86,16 @@ def struct Outcome {
     hits as map of string to bool
 };
 
+# The passing outcome with no annotations, built once.
+def const PASSED as Outcome init Outcome{valid: true, errors: [], props: {}, items: 0, hits: {}};
+
 /**
  * A passing outcome with no annotations.
  *
  * @return {Outcome} the outcome
  */
 func pass() {
-    return Outcome{valid: true, errors: [], props: {}, items: 0, hits: {}};
+    return PASSED;
 }
 
 /**
@@ -114,11 +124,23 @@ func fail(here as Here, keyword as string, message as string) {
  * @throws {Error} always, of kind `jsonschema`
  */
 func badSchema(here as Here, message as string) {
-    def at as string init $here.schemaPath;
-    if ($at == "") {
-        $at = "the root";
+    throw Error{
+        kind: ERROR_KIND,
+        message: "invalid schema at " + atText($here.schemaPath) + ": " + $message
+    };
+}
+
+/**
+ * A schema location for an error message.
+ *
+ * @param pointer {string} the JSON Pointer
+ * @return {string} the pointer, or `the root` for `""`
+ */
+func atText(pointer as string) {
+    if ($pointer == "") {
+        return "the root";
     }
-    throw Error{kind: ERROR_KIND, message: "invalid schema at " + $at + ": " + $message};
+    return $pointer;
 }
 
 /**
@@ -128,6 +150,9 @@ func badSchema(here as Here, message as string) {
  * @return {string} the escaped token
  */
 func escapeToken(token as string) {
+    if (not strings.contains($token, "~") and not strings.contains($token, "/")) {
+        return $token;
+    }
     return strings.replace(strings.replace($token, "~", "~0"), "/", "~1");
 }
 
@@ -212,6 +237,17 @@ func isWhole(f as float) {
 }
 
 /**
+ * Whether a float is a whole number inside the int range, so `convert.toInt`
+ * gives exactly its value.
+ *
+ * @param f {float} the number
+ * @return {bool} whether it is a whole number from -2^63 to just under 2^63
+ */
+func fitsInt(f as float) {
+    return $f >= -9223372036854775808.0 and $f < 9223372036854775808.0 and isWhole($f);
+}
+
+/**
  * Whether a value is any kind of number.
  *
  * @param v {json.Value} the value
@@ -235,13 +271,28 @@ func limitText(node as json.Value, k as string) {
 
 /**
  * A property name as a JSON string, for a message: quoted, with control
- * characters escaped so a name cannot break a line of `describe`.
+ * characters escaped so a name cannot break a line of `describe`, and cut
+ * like `show`. The issue's `instancePath` keeps the whole name.
  *
  * @param name {string} the name
- * @return {string} the name as JSON
+ * @return {string} at most 60 characters of the name as JSON
  */
 func quoted(name as string) {
-    return json.encode($name);
+    return shorten(json.encode($name));
+}
+
+/**
+ * Property names for a message, each `quoted`, comma-separated.
+ *
+ * @param names {list of string} the names
+ * @return {string} the quoted names
+ */
+func quotedList(names as list of string) {
+    def out as list of string init [];
+    for (def n in $names) {
+        $out[] = quoted($n);
+    }
+    return strings.join($out, ", ");
 }
 
 /**
@@ -251,7 +302,16 @@ func quoted(name as string) {
  * @return {string} at most 60 characters of its JSON
  */
 func show(v as json.Value) {
-    def text as string init json.encode($v);
+    return shorten(json.encode($v));
+}
+
+/**
+ * Text cut to 60 characters, the last three `...` when it was longer.
+ *
+ * @param text {string} the text
+ * @return {string} at most 60 characters
+ */
+func shorten(text as string) {
     if (len($text) > 60) {
         return strings.substring($text, 0, 57) + "...";
     }

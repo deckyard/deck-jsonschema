@@ -2,13 +2,41 @@
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
 # pragma-jennifer-version: >=0.25.0
 
-# jsonschema - format assertion, for a schema compiled with `assertFormats($s, true)`.
+# jsonschema - format assertion: for a schema switched on with `assertFormats($s, true)`,
+# and in a resource whose meta-schema lists the format-assertion vocabulary.
 #
-# Checked: `date-time`, `date`, `time`, `duration`, `email`, `hostname`,
-# `ipv4`, `ipv6`, `uri`, `uri-reference`, `uuid`, `json-pointer`,
-# `relative-json-pointer` and `regex`. Every other format passes, as the
-# specification allows for one an implementation does not know.
+# Checked: the 14 in CHECKED_FORMATS. Under `assertFormats` every other
+# format passes, as Validation 7.2.1 allows. Under the vocabulary, a format
+# in UNCHECKED_FORMATS is refused when the schema compiles and any other
+# unknown name fails the value (Validation 7.2.2, 7.2.3).
 # Spliced into jsonschema.j via include - not a standalone module.
+
+# The formats `formatMatches` checks.
+def const CHECKED_FORMATS as map of string to bool init {
+    "date-time": true,
+    "date": true,
+    "time": true,
+    "duration": true,
+    "email": true,
+    "hostname": true,
+    "ipv4": true,
+    "ipv6": true,
+    "uri": true,
+    "uri-reference": true,
+    "uuid": true,
+    "json-pointer": true,
+    "relative-json-pointer": true,
+    "regex": true
+};
+
+# The 2020-12 formats it does not check: they need IDNA or RFC 6570 tables.
+def const UNCHECKED_FORMATS as map of string to bool init {
+    "idn-email": true,
+    "idn-hostname": true,
+    "iri": true,
+    "iri-reference": true,
+    "uri-template": true
+};
 
 # An ISO 8601 duration as RFC 3339 appendix A defines it.
 def const DURATION_TIME as string init "T(?:[0-9]+H(?:[0-9]+M(?:[0-9]+S)?)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S)";
@@ -422,7 +450,8 @@ func isJsonPointer(s as string) {
 }
 
 /**
- * A relative JSON Pointer: a non-negative integer, then `#` or a JSON Pointer.
+ * A relative JSON Pointer: a non-negative integer, an optional `+N` / `-N`
+ * index offset, then `#` or a JSON Pointer.
  *
  * @param s {string} the text
  * @return {bool} whether it is a relative JSON Pointer
@@ -436,8 +465,9 @@ func isRelativeJsonPointer(s as string) {
 /**
  * Whether a string compiles as a regular expression.
  *
- * Compiled as RE2, Jennifer's dialect, not ECMA-262: the two disagree at the
- * edges, so this is an approximation.
+ * Compiled as RE2 after the `ecmaPattern` rewrite, not as ECMA-262: RE2
+ * accepts Python-style named groups and inline flags, and rejects
+ * lookaround, backreferences and the empty class `[]`.
  *
  * @param s {string} the text
  * @return {bool} whether it compiles
@@ -446,6 +476,9 @@ func isRegex(s as string) {
     try {
         regex.matches(ecmaPattern($s), "");
     } catch (e) {
+        if ($e.kind == "limit") {
+            throw $e;
+        }
         return false;
     }
     return true;

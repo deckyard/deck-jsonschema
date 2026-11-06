@@ -126,7 +126,8 @@ func testIntegerBoundsCompareExactly() {
 }
 
 func testHugeNumbersDoNotOverflow() {
-    testing.assertTrue(isValid(compile(json.decode('{"multipleOf": 3.0}')), json.decode("1e300")));
+    testing.assertTrue(isValid(compile(json.decode('{"multipleOf": 2.0}')), json.decode("1e300")));
+    testing.assertFalse(isValid(compile(json.decode('{"multipleOf": 3.0}')), json.decode("1e300")));
     testing.assertFalse(isValid(compile(json.decode('{"minLength": 1e20}')), json.decode('"a"')));
 }
 
@@ -157,4 +158,65 @@ func failNegativeMinLength() {
 
 func testCountRejectsNegativeBounds() {
     testing.assertThrows("failNegativeMinLength", ERROR_KIND);
+}
+
+func testPatternLetsTheCallLimitThrough() {
+    for (def outcome in nearTheLimit("pattern")) {
+        testing.assertTrue($outcome == "true" or $outcome == "limit");
+    }
+}
+
+func testMultipleOfIsExact() {
+    testing.assertFalse(isValid(
+        compile(json.decode('{"multipleOf": 2.0}')),
+        json.decode("1000000001")));
+    testing.assertFalse(isValid(
+        compile(json.decode('{"multipleOf": 2}')),
+        json.decode("3000000001.0")));
+    testing.assertFalse(isValid(
+        compile(json.decode('{"multipleOf": 0.5}')),
+        json.decode("1000000000000000.25")));
+    testing.assertTrue(isValid(
+        compile(json.decode('{"multipleOf": 0.0001}')),
+        json.decode("0.0075")));
+    testing.assertTrue(isValid(
+        compile(json.decode('{"multipleOf": 1e-8}')),
+        json.decode("12391239123")));
+    testing.assertFalse(isValid(
+        compile(json.decode('{"multipleOf": 0.123456789}')),
+        json.decode("1e308")));
+    testing.assertTrue(isValid(
+        compile(json.decode('{"multipleOf": 7}')),
+        json.decode("-9223372036854775807")));
+    testing.assertFalse(isValid(compile(json.decode('{"multipleOf": 2}')), json.decode("2.5")));
+}
+
+func testDecimalOfReadsTheShortestText() {
+    def d as Decimal init decimalOf(json.decode("0.0075"));
+    testing.assertEqual($d.coefficient, 75);
+    testing.assertEqual($d.exponent, -4);
+    $d = decimalOf(json.decode("-1.5e+20"));
+    testing.assertEqual($d.coefficient, 15);
+    testing.assertEqual($d.exponent, 19);
+    testing.assertEqual(decimalOf(json.decode("1200")).exponent, 2);
+    testing.assertEqual(decimalOf(json.decode("0.0")).coefficient, 0);
+    testing.assertEqual(
+        decimalMultiple(decimalOf(json.decode("1")), decimalOf(json.decode("1e-310"))),
+        1);
+    testing.assertEqual(
+        decimalMultiple(decimalOf(json.decode("0.05")), decimalOf(json.decode("0.1"))),
+        0);
+}
+
+func testTinyMultipleOfDoesNotOverflow() {
+    def s as Schema init compile(json.decode('{"multipleOf": 1e-310}'));
+    testing.assertTrue(isValid($s, json.decode("1")));
+    testing.assertTrue(validate($s, json.decode("1")).valid);
+}
+
+func testPatternReadsSurrogatePairs() {
+    testing.assertEqual(ecmaPattern('^\uD83D\uDE00$'), '^\x{1f600}$');
+    testing.assertEqual(ecmaPattern('\uD83Dx'), '\x{D83D}x');
+    def s as Schema init compile(json.decode('{"pattern": "^\\uD83D\\uDE00$"}'));
+    testing.assertTrue(isValid($s, json.decode('"😀"')));
 }
