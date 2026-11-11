@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.25.0
+# pragma-jennifer-version: >=0.26.0
 
 # jsonschema - schema resources and how a reference finds one: indexing `$id`, `$anchor`
 # and `$dynamicAnchor`, the `Registry` of known documents, and `compile`.
