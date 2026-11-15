@@ -6,6 +6,26 @@
 # Spliced into jsonschema_test.j via include - run with:
 #   jennifer test src/jsonschema_test.j
 
+# An instance nested past the interpreter's call-depth limit under a
+# recursive schema: the "limit" error passes on unchanged from both entry
+# points, so a caller tells it apart from a malformed schema.
+func testTooDeepAnInstanceIsKindLimit() {
+    def s as Schema init compile(json.decode('{"items": {"$ref": "#"}}'));
+    def deep as json.Value init json.decode(strings.repeat("[", 900) + strings.repeat("]", 900));
+    for (def fast in [false, true]) {
+        try {
+            if ($fast) {
+                isValid($s, $deep);
+            } else {
+                validate($s, $deep);
+            }
+            testing.assertTrue(false);
+        } catch (e) {
+            testing.assertEqual($e.kind, "limit");
+        }
+    }
+}
+
 func testSuiteAllOf() {
     assertSuite("allOf.json");
 }
@@ -127,8 +147,8 @@ func failTooDeep() {
     isValid(compile(json.decode('{"items": {"$ref": "#"}}')), nested(999));
 }
 
-func testTooDeepIsASchemaError() {
-    testing.assertThrows("failTooDeep", ERROR_KIND);
+func testTooDeepIsKindLimit() {
+    testing.assertThrows("failTooDeep", "limit");
 }
 
 func testDescribeKeepsOneLinePerFailure() {

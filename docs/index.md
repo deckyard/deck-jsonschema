@@ -41,4 +41,6 @@ import "@deckyard/jsonschema/" as jsonschema;
 
 A schema the deck cannot use throws an `Error` of kind `jsonschema`, with a
 message that names the place in the schema. A value that fails a schema does
-not throw; it comes back in the `Result`.
+not throw; it comes back in the `Result`. An instance nested too deeply to
+evaluate reaches Jennifer's call-depth limit, kind `"limit"`, passed on
+unchanged.

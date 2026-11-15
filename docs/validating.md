@@ -103,8 +103,8 @@ matching hang.
   instance is a reference cycle, and throws kind `jsonschema`. A recursive
   schema walking a deep instance moves on every level and is not limited.
 - A deeply nested instance under a recursive schema reaches Jennifer's
-  call-depth limit; `validate` and `isValid` then throw kind `jsonschema`
-  with the message `the instance is nested too deeply to evaluate`. With
+  call-depth limit; `validate` and `isValid` then pass its `Error` on
+  unchanged, kind `"limit"`, the generic kind of a reached cap. With
   `{"items": {"$ref": "#"}}` the limit is between 520 and 540 nested arrays;
   each extra keyword per level lowers it. `json.decode` refuses more than
   1000 levels.

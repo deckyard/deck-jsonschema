@@ -6,7 +6,7 @@
 # JSON Pointer tokens, JSON Schema's type names, and issue construction.
 # Spliced into jsonschema.j via include - not a standalone module.
 
-/** The `kind` of every `Error` this deck throws: a schema it cannot use. */
+/** The `kind` of the deck's own errors: a schema it cannot use. */
 export def const ERROR_KIND as string init "jsonschema";
 
 /** The base URI a schema without an absolute `$id` is resolved against. */

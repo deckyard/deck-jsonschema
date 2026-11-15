@@ -36,7 +36,8 @@ the deck does not check. `register` throws when `uri` is relative.
 Both checks throw an `Error` of kind `jsonschema` when evaluation reaches a part
 of the schema it cannot use: a `$ref` that resolves to nothing, a reference
 cycle, a keyword with a value of the wrong type, or a `pattern` RE2 cannot
-compile.
+compile. An instance nested so deeply that evaluation reaches Jennifer's
+call-depth limit throws that limit's `Error`, kind `"limit"`, unchanged.
 
 ## Types
 
@@ -86,5 +87,5 @@ resolving references and translating patterns per value.
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `ERROR_KIND` | `"jsonschema"` | the `kind` of every `Error` the deck throws |
+| `ERROR_KIND` | `"jsonschema"` | the `kind` of the deck's own errors |
 | `DEFAULT_BASE` | `"jsonschema:/root.json"` | the base URI of a schema without an absolute `$id` |

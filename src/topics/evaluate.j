@@ -12,10 +12,6 @@
 # deep instance moves on every level, so it is not limited by this.
 def const MAX_DEPTH as int init 200;
 
-# Why evaluation stopped when it reached Jennifer's call-depth limit, which an
-# instance nested several hundred levels deep does.
-def const TOO_DEEP as string init "the instance is nested too deeply to evaluate";
-
 # The keywords the dispatcher runs, by kind: those that apply in place to
 # any value, the single-value keywords of `valueKeyword`, and those that act
 # only on an object or only on an array. Anything else is passed over:
@@ -71,19 +67,13 @@ def const KEYWORDS as map of string to int init {
  * @param instance {json.Value} the value to check
  * @return {Result} whether it is valid, and why not
  * @throws {Error} kind `jsonschema` if the schema is malformed where evaluation reaches
- *   it, or the instance is nested too deeply to evaluate
+ *   it; kind `"limit"` (the interpreter's call-depth limit, passed on unchanged)
+ *   if the instance is nested too deeply to evaluate
  * @example def r as jsonschema.Result init jsonschema.validate($s, json.decode('"hi"'));
  */
 export func validate(s as Schema, instance as json.Value) {
-    def o as Outcome init pass();
-    try {
-        $o = evaluate($s, $s.root, start($s, false), $instance);
-    } catch (e) {
-        if ($e.kind == "limit") {
-            throw Error{kind: ERROR_KIND, message: TOO_DEEP};
-        }
-        throw $e;
-    }
+    # A reached call-depth limit is kind "limit" and passes on unchanged.
+    def o as Outcome init evaluate($s, $s.root, start($s, false), $instance);
     return Result{valid: $o.valid, errors: $o.errors};
 }
 
@@ -98,19 +88,12 @@ export func validate(s as Schema, instance as json.Value) {
  * @param instance {json.Value} the value to check
  * @return {bool} whether it is valid
  * @throws {Error} kind `jsonschema` if the schema is malformed where evaluation reaches
- *   it, or the instance is nested too deeply to evaluate
+ *   it; kind `"limit"` (the interpreter's call-depth limit, passed on unchanged)
+ *   if the instance is nested too deeply to evaluate
  */
 export func isValid(s as Schema, instance as json.Value) {
-    def valid as bool init false;
-    try {
-        $valid = evaluate($s, $s.root, start($s, true), $instance).valid;
-    } catch (e) {
-        if ($e.kind == "limit") {
-            throw Error{kind: ERROR_KIND, message: TOO_DEEP};
-        }
-        throw $e;
-    }
-    return $valid;
+    # A reached call-depth limit is kind "limit" and passes on unchanged.
+    return evaluate($s, $s.root, start($s, true), $instance).valid;
 }
 
 /**
