@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - schema resources and how a reference finds one: indexing `$id`, `$anchor`
 # and `$dynamicAnchor`, the `Registry` of known documents, and `compile`.
@@ -720,7 +720,7 @@ func stripFragment(u as string) {
     if ($hash < 0) {
         return $u;
     }
-    return strings.substring($u, 0, $hash);
+    return $u[..$hash];
 }
 
 /**
@@ -734,7 +734,7 @@ func fragmentOf(u as string) {
     if ($hash < 0) {
         return "";
     }
-    return strings.substring($u, $hash + 1, len($u));
+    return $u[$hash + 1..len($u)];
 }
 
 /**

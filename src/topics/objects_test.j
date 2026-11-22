@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - white-box tests for the objects topic.
 # Spliced into jsonschema_test.j via include - run with:
@@ -99,7 +99,7 @@ func testDependenciesKeywordBothForms() {
 }
 
 func testMessagesQuoteAndShortenNames() {
-    def long as string init strings.repeat("k", 1000);
+    def long as string init strings.replicate("k", 1000);
     def inst as json.Value init json.decode('{"' + $long + '": 1, "a\nb": 2}');
     for (def schema in [
         '{"additionalProperties": false}',

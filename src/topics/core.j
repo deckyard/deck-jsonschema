@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - the public types, the error kind and the helpers every other topic uses:
 # JSON Pointer tokens, JSON Schema's type names, and issue construction.
@@ -313,7 +313,7 @@ func show(v as json.Value) {
  */
 func shorten(text as string) {
     if (len($text) > 60) {
-        return strings.substring($text, 0, 57) + "...";
+        return $text[..57] + "...";
     }
     return $text;
 }

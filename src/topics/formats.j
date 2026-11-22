@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - format assertion: for a schema switched on with `assertFormats($s, true)`,
 # and in a resource whose meta-schema lists the format-assertion vocabulary.
@@ -201,8 +201,8 @@ func isEmail(s as string) {
     if ($at < 1) {
         return false;
     }
-    def local as string init strings.substring($s, 0, $at);
-    def domain as string init strings.substring($s, $at + 1, len($s));
+    def local as string init $s[..$at];
+    def domain as string init $s[$at + 1..len($s)];
     return isLocalPart($local) and isMailDomain($domain);
 }
 
@@ -233,9 +233,9 @@ func isMailDomain(s as string) {
     if (not strings.endsWith($s, "]")) {
         return false;
     }
-    def inner as string init strings.substring($s, 1, len($s) - 1);
+    def inner as string init $s[1..len($s) - 1];
     if (strings.startsWith(strings.lower($inner), "ipv6:")) {
-        return isIPv6(strings.substring($inner, 5, len($inner)));
+        return isIPv6($inner[5..len($inner)]);
     }
     return isIPv4($inner);
 }
@@ -263,7 +263,7 @@ func isHostname(s as string) {
             return false;
         }
         # RFC 5891: hyphens in the third and fourth places mark an A-label.
-        if (len($label) >= 4 and strings.substring($label, 2, 4) == "--" and
+        if (len($label) >= 4 and $label[2..4] == "--" and
             not strings.startsWith($lower, "xn--")) {
             return false;
         }
@@ -382,7 +382,7 @@ func isUri(s as string, absolute as bool) {
     def rest as string init $s;
     if ($m.start >= 0) {
         $authority = $m.groups[0];
-        $rest = strings.substring($s, $m.end, len($s));
+        $rest = $s[$m.end..len($s)];
     }
     if (strings.contains($rest, "[") or strings.contains($rest, "]")) {
         return false;
@@ -401,10 +401,10 @@ func isAuthority(a as string) {
     def at as int init strings.indexOf($host, "@");
     if ($at >= 0) {
         # User info may hold neither another `@` nor a bracket.
-        if (regex.matches("[\\[\\]]", strings.substring($host, 0, $at))) {
+        if (regex.matches("[\\[\\]]", $host[..$at])) {
             return false;
         }
-        $host = strings.substring($host, $at + 1, len($host));
+        $host = $host[$at + 1..len($host)];
         if (strings.contains($host, "@")) {
             return false;
         }
@@ -414,8 +414,8 @@ func isAuthority(a as string) {
         if ($close < 0) {
             return false;
         }
-        def port as string init strings.substring($host, $close + 1, len($host));
-        return isIPv6(strings.substring($host, 1, $close)) and
+        def port as string init $host[$close + 1..len($host)];
+        return isIPv6($host[1..$close]) and
             regex.matches("^(?::[0-9]*)?$", $port);
     }
     if (strings.contains($host, "[") or strings.contains($host, "]")) {

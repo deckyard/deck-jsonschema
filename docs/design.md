@@ -135,8 +135,9 @@ Not in scope:
 
 ## Dependencies on the interpreter
 
-- Floor `>=0.26.0`. No capabilities; not declared for `jennifer-tiny`,
-  though the exported API gives the same results there.
+- Floor `>=0.27.0`: the tests use `strings.replicate`, new in 0.27.0. No
+  capabilities; not declared for `jennifer-tiny`, though the exported API
+  gives the same results there.
 - The bundled `uri` module for reference resolution, `json` pointer
   accessors, and `regex` on RE2.
 - The interpreter's call-depth limit raised as kind `"limit"`, which the

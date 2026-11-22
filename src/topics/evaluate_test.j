@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - white-box tests for the evaluate topic.
 # Spliced into jsonschema_test.j via include - run with:
@@ -11,7 +11,8 @@
 # points, so a caller tells it apart from a malformed schema.
 func testTooDeepAnInstanceIsKindLimit() {
     def s as Schema init compile(json.decode('{"items": {"$ref": "#"}}'));
-    def deep as json.Value init json.decode(strings.repeat("[", 900) + strings.repeat("]", 900));
+    def deep as json.Value init json.decode(strings.replicate("[", 900) +
+        strings.replicate("]", 900));
     for (def fast in [false, true]) {
         try {
             if ($fast) {

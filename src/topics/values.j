@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - keywords on a single value: `type`, `enum`, `const`, the numeric bounds,
 # the string length and pattern keywords, and `format`.
@@ -327,29 +327,29 @@ func decimalOf(v as json.Value) {
         $text = convert.toString(json.asFloat($v));
     }
     if (strings.startsWith($text, "-")) {
-        $text = strings.substring($text, 1, len($text));
+        $text = $text[1..len($text)];
     }
     def exponent as int init 0;
     def e as int init strings.indexOf($text, "e");
     if ($e >= 0) {
-        def power as string init strings.substring($text, $e + 1, len($text));
+        def power as string init $text[$e + 1..len($text)];
         if (strings.startsWith($power, "+")) {
-            $power = strings.substring($power, 1, len($power));
+            $power = $power[1..len($power)];
         }
         $exponent = convert.toInt($power);
-        $text = strings.substring($text, 0, $e);
+        $text = $text[..$e];
     }
     def dot as int init strings.indexOf($text, ".");
     if ($dot >= 0) {
         $exponent = $exponent - (len($text) - $dot - 1);
-        $text = strings.substring($text, 0, $dot) + strings.substring($text, $dot + 1, len($text));
+        $text = $text[..$dot] + $text[$dot + 1..len($text)];
     }
     def from as int init 0;
-    while ($from < len($text) and strings.substring($text, $from, $from + 1) == "0") {
+    while ($from < len($text) and $text[$from..$from + 1] == "0") {
         $from = $from + 1;
     }
     def to2 as int init len($text);
-    while ($to2 > $from and strings.substring($text, $to2 - 1, $to2) == "0") {
+    while ($to2 > $from and $text[$to2 - 1..$to2] == "0") {
         $to2 = $to2 - 1;
         $exponent = $exponent + 1;
     }
@@ -360,7 +360,7 @@ func decimalOf(v as json.Value) {
         return Decimal{coefficient: -1, exponent: $exponent, digits: $to2 - $from};
     }
     return Decimal{
-        coefficient: convert.toInt(strings.substring($text, $from, $to2)),
+        coefficient: convert.toInt($text[$from..$to2]),
         exponent: $exponent,
         digits: $to2 - $from
     };
@@ -589,9 +589,9 @@ func escapeCode(letter as string, chars as list of string, at as int) {
         if (len($taken) < 4) {
             return "";
         }
-        def unit as string init strings.substring($taken, 0, 4);
+        def unit as string init $taken[..4];
         if (isLeadSurrogate($unit) and $at + 10 <= len($chars)) {
-            def trail as string init strings.join(lists.slice($chars, $at + 4, $at + 10), "");
+            def trail as string init strings.join($chars[$at + 4..$at + 10], "");
             if (regex.matches('^\\u[dD][c-fC-F][0-9A-Fa-f]{2}$', $trail)) {
                 return $unit + $trail;
             }
@@ -645,10 +645,10 @@ func ecmaEscape(letter as string, code as string, inClass as bool) {
         return "\\x" + $code;
     }
     if ($letter == "u" and len($code) == 10) {
-        def high as int init convert.toInt(strings.substring($code, 0, 4), 16);
-        def low as int init convert.toInt(strings.substring($code, 6, 10), 16);
+        def high as int init convert.toInt($code[..4], 16);
+        def low as int init convert.toInt($code[6..10], 16);
         def point as int init 65536 + ($high - 55296) * 1024 + ($low - 56320);
-        return "\\x" + '{' + convert.toString($point, 16) + '}';
+        return "\\x" + '{' + io.sprintf("%d|base=16", $point) + '}';
     }
     if ($letter == "u" and $code != "") {
         return "\\x" + '{' + $code + '}';

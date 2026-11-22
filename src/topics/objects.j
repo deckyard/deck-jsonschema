@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - keywords on objects: `properties`, `patternProperties`,
 # `additionalProperties`, `required`, `dependentRequired`,
@@ -268,13 +268,13 @@ func required(node as json.Value, here as Here, inst as json.Value) {
  */
 func absent(node as json.Value, here as Here, at as string, inst as json.Value) {
     if (kindAt($node, $at) != "list") {
-        badSchema($here, strings.substring($at, 1, len($at)) + " must be an array of strings");
+        badSchema($here, $at[1..len($at)] + " must be an array of strings");
     }
     def out as list of string init [];
     for (def i in 0..json.length($node, $at)) {
         def item as string init $at + "/" + convert.toString($i);
         if (kindAt($node, $item) != "string") {
-            badSchema($here, strings.substring($at, 1, len($at)) + " must be an array of strings");
+            badSchema($here, $at[1..len($at)] + " must be an array of strings");
         }
         def name as string init json.asString($node, $item);
         if (not json.has($inst, childPointer("", $name))) {

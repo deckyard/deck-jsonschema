@@ -49,7 +49,7 @@ if (not $r.valid) {
 
 ## Requirements
 
-Jennifer 0.26.0 or newer. Pure computation: no network, no capabilities. Not
+Jennifer 0.27.0 or newer. Pure computation: no network, no capabilities. Not
 tested on `jennifer-tiny`.
 
 ## Development

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.26.0
+# pragma-jennifer-version: >=0.27.0
 
 # jsonschema - white-box tests for the core topic, and the harness that runs
 # the JSON-Schema-Test-Suite files in testdata/suite. Each topic's overlay runs
@@ -35,7 +35,7 @@ func suiteRegistry() {
         if ($st.isDir or not strings.endsWith($st.path, ".json")) {
             continue;
         }
-        def rel as string init strings.substring($st.path, len($root), len($st.path));
+        def rel as string init $st.path[len($root)..len($st.path)];
         $reg = register($reg, SUITE_HOST + $rel, json.decode(fs.readString($st.path)));
     }
     return $reg;
@@ -200,7 +200,7 @@ func testIsNumber() {
 
 func testShowShortensLongValues() {
     testing.assertEqual(show(json.decode("[1,2]")), "[1,2]");
-    testing.assertEqual(len(show(json.decode(json.encode(strings.repeat("x", 100))))), 60);
+    testing.assertEqual(len(show(json.decode(json.encode(strings.replicate("x", 100))))), 60);
 }
 
 func testFailRecordsWhereAndWhat() {
