@@ -131,6 +131,33 @@ func testHugeNumbersDoNotOverflow() {
     testing.assertFalse(isValid(compile(json.decode('{"minLength": 1e20}')), json.decode('"a"')));
 }
 
+# Integers outside int64 are exact from Jennifer 0.28.0 on (floats before);
+# every keyword that reads a number takes them on both.
+func testIntegersPastInt64AreRead() {
+    def big as string init "18446744073709551617";
+    testing.assertTrue(isValid(compile(json.decode('{"multipleOf": 1}')), json.decode($big)));
+    testing.assertTrue(isValid(compile(json.decode('{"multipleOf": 0.5}')), json.decode($big)));
+    testing.assertTrue(isValid(
+        compile(json.decode('{"multipleOf": ' + $big + '}')),
+        json.decode("0")));
+    testing.assertFalse(isValid(
+        compile(json.decode('{"minLength": ' + $big + '}')),
+        json.decode('"a"')));
+    testing.assertTrue(isValid(
+        compile(json.decode('{"uniqueItems": true}')),
+        json.decode("[" + $big + ", 1]")));
+    testing.assertFalse(isValid(compile(json.decode('{"maximum": 1.5}')), json.decode($big)));
+    testing.assertTrue(isValid(compile(json.decode('{"minimum": 1.5}')), json.decode($big)));
+    testing.assertTrue(isValid(
+        compile(json.decode('{"maximum": ' + $big + '}')),
+        json.decode("-" + $big)));
+    testing.assertEqual(intOrder("-20", "-3"), -1);
+    testing.assertEqual(intOrder("20", "3"), 1);
+    testing.assertEqual(intOrder("-3", "2"), -1);
+    testing.assertEqual(intOrder("12", "12"), 0);
+    testing.assertEqual(intOrder("-12", "-13"), 1);
+}
+
 func failTypeListOfNumbers() {
     validate(compile(json.decode('{"type": [1]}')), json.decode("1"));
 }

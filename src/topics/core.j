@@ -248,6 +248,21 @@ func fitsInt(f as float) {
 }
 
 /**
+ * A number as the nearest float. An integer goes through its JSON digits:
+ * from Jennifer 0.28.0 on one outside int64 is exact, and `json.asFloat`
+ * refuses it unless a float holds it exactly.
+ *
+ * @param v {json.Value} the number
+ * @return {float} its value, rounded to the nearest float
+ */
+func floatOf(v as json.Value) {
+    if (json.typeOf($v) == "int") {
+        return convert.toFloat(json.encode($v));
+    }
+    return json.asFloat($v);
+}
+
+/**
  * Whether a value is any kind of number.
  *
  * @param v {json.Value} the value

@@ -142,14 +142,14 @@ func bound(node as json.Value, here as Here, k as string) {
     if (not isNumber(json.get($node, "/" + $k))) {
         badSchema($here, $k + " must be a number");
     }
-    return json.asFloat($node, "/" + $k);
+    return floatOf(json.get($node, "/" + $k));
 }
 
 /**
  * How a number compares with the bound a numeric keyword carries.
  *
- * Two integers compare exactly; anything else as floats, which past 2^53
- * cannot tell neighbouring integers apart.
+ * Two integers compare exactly, by their digits (`intOrder`); anything else
+ * as floats, which past 2^53 cannot tell neighbouring integers apart.
  *
  * @param node {json.Value} the schema object
  * @param here {Here} its position
@@ -161,17 +161,9 @@ func bound(node as json.Value, here as Here, k as string) {
 func compareBound(node as json.Value, here as Here, inst as json.Value, k as string) {
     def b as float init bound($node, $here, $k);
     if (json.typeOf($inst) == "int" and kindAt($node, "/" + $k) == "int") {
-        def x as int init json.asInt($inst);
-        def y as int init json.asInt($node, "/" + $k);
-        if ($x < $y) {
-            return -1;
-        }
-        if ($x > $y) {
-            return 1;
-        }
-        return 0;
+        return intOrder(json.encode($inst), json.encode(json.get($node, "/" + $k)));
     }
-    def v as float init json.asFloat($inst);
+    def v as float init floatOf($inst);
     if ($v < $b) {
         return -1;
     }
@@ -179,6 +171,47 @@ func compareBound(node as json.Value, here as Here, inst as json.Value, k as str
         return 1;
     }
     return 0;
+}
+
+/**
+ * How two integers compare, from their JSON digits. Jennifer 0.28.0 keeps
+ * an integer outside int64 exactly (`json.asInt` refuses it), so the digits
+ * are the one exact form on every interpreter.
+ *
+ * @param a {string} an integer as JSON writes it: optional `-`, no leading zeros
+ * @param b {string} another
+ * @return {int} -1, 0 or 1 as `a` is below, equal to or above `b`
+ */
+func intOrder(a as string, b as string) {
+    def negA as bool init strings.startsWith($a, "-");
+    def negB as bool init strings.startsWith($b, "-");
+    if ($negA != $negB) {
+        if ($negA) {
+            return -1;
+        }
+        return 1;
+    }
+    def x as string init $a;
+    def y as string init $b;
+    if ($negA) {
+        $x = $a[1..len($a)];
+        $y = $b[1..len($b)];
+    }
+    def order as int init 0;
+    if (len($x) != len($y)) {
+        $order = 1;
+        if (len($x) < len($y)) {
+            $order = -1;
+        }
+    } elseif ($x < $y) {
+        $order = -1;
+    } elseif ($x > $y) {
+        $order = 1;
+    }
+    if ($negA) {
+        return -$order;
+    }
+    return $order;
 }
 
 /**
@@ -276,7 +309,7 @@ func multipleOf(node as json.Value, here as Here, inst as json.Value) {
     if ($exact == 0) {
         return fail($here, "multipleOf", $message);
     }
-    def q as float init json.asFloat($inst) / $m;
+    def q as float init floatOf($inst) / $m;
     # Past 2^53 every float is whole, and math.round would not fit an int.
     if (math.abs($q) >= 9007199254740992.0) {
         return pass();
@@ -291,10 +324,21 @@ func multipleOf(node as json.Value, here as Here, inst as json.Value) {
  * Whether a number is a whole number `intOf` can return exactly.
  *
  * @param v {json.Value} the number
- * @return {bool} whether it is an int, or a whole float inside the int range
+ * @return {bool} whether it is an int inside the int range, or a whole
+ *   float there
  */
 func isIntValue(v as json.Value) {
     if (json.typeOf($v) == "int") {
+        # An integer outside int64 is exact from Jennifer 0.28.0 on, and
+        # `asInt` refuses it (a float before).
+        try {
+            json.asInt($v);
+        } catch (e) {
+            if ($e.kind != "json") {
+                throw $e;
+            }
+            return false;
+        }
         return true;
     }
     return fitsInt(json.asFloat($v));
@@ -322,7 +366,8 @@ func intOf(v as json.Value) {
 func decimalOf(v as json.Value) {
     def text as string init "";
     if (json.typeOf($v) == "int") {
-        $text = convert.toString(json.asInt($v));
+        # Every digit, outside int64 too (Jennifer 0.28.0 keeps them).
+        $text = json.encode($v);
     } else {
         $text = convert.toString(json.asFloat($v));
     }
@@ -464,13 +509,13 @@ func stringKeyword(s as Schema, node as json.Value, here as Here, inst as json.V
  */
 func count(node as json.Value, here as Here, k as string) {
     def v as json.Value init json.get($node, "/" + $k);
-    if (typeName($v) != "integer" or json.asFloat($v) < 0.0) {
+    if (typeName($v) != "integer" or floatOf($v) < 0.0) {
         badSchema($here, $k + " must be a non-negative integer");
     }
-    if (json.asFloat($v) >= 9007199254740992.0) {
+    if (floatOf($v) >= 9007199254740992.0) {
         return 9007199254740992;
     }
-    return convert.toInt(json.asFloat($v));
+    return convert.toInt(floatOf($v));
 }
 
 /**

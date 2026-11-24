@@ -216,7 +216,8 @@ func uniqueItems(node as json.Value, here as Here, inst as json.Value) {
  */
 func sameKey(v as json.Value) {
     match (json.typeOf($v)) {
-        when "int" { return "n" + convert.toString(json.asInt($v)); }
+        # Every digit, outside int64 too (Jennifer 0.28.0 keeps them).
+        when "int" { return "n" + json.encode($v); }
         when "float" {
             def f as float init json.asFloat($v);
             if (fitsInt($f)) {
