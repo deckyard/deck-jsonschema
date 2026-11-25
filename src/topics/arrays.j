@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 # jsonschema - keywords on arrays: `prefixItems`, `items`, `contains` with its bounds,
 # `minItems`, `maxItems`, `uniqueItems` and `unevaluatedItems`.
@@ -221,7 +221,7 @@ func sameKey(v as json.Value) {
         when "float" {
             def f as float init json.asFloat($v);
             if (fitsInt($f)) {
-                return "n" + convert.toString(convert.toInt($f));
+                return "n" + convert.toString(math.trunc($f));
             }
             return "n" + convert.toString($f);
         }

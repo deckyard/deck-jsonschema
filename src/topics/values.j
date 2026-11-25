@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 # jsonschema - keywords on a single value: `type`, `enum`, `const`, the numeric bounds,
 # the string length and pattern keywords, and `format`.
@@ -354,7 +354,7 @@ func intOf(v as json.Value) {
     if (json.typeOf($v) == "int") {
         return json.asInt($v);
     }
-    return convert.toInt(json.asFloat($v));
+    return math.trunc(json.asFloat($v));
 }
 
 /**

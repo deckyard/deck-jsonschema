@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: LGPL-3.0-only
 # SPDX-FileCopyrightText: Copyright (C) 2026 mplx <mplx@jennifer-lang.dev>
-# pragma-jennifer-version: >=0.27.0
+# pragma-jennifer-version: >=0.28.0
 
 # jsonschema - format assertion: for a schema switched on with `assertFormats($s, true)`,
 # and in a resource whose meta-schema lists the format-assertion vocabulary.

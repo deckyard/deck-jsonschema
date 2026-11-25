@@ -135,7 +135,7 @@ Not in scope:
 
 ## Dependencies on the interpreter
 
-- Floor `>=0.27.0`: the tests use `strings.replicate`, new in 0.27.0. No
+- Floor `>=0.28.0` (the calls 0.29.0 removes are replaced by their 0.28.0 forms): the tests use `strings.replicate`, new in 0.27.0. No
   capabilities; not declared for `jennifer-tiny`, though the exported API
   gives the same results there.
 - The bundled `uri` module for reference resolution, `json` pointer
