@@ -96,7 +96,7 @@ Not in scope:
 - Deep instances end at the interpreter's call-depth limit (kind
   `"limit"`); documents are bounded first by `json.decode`'s nesting cap.
 - There is no work budget: a large instance against a large schema costs
-  time proportional to both (about 0.7 ms per record of five typed
+  time proportional to both (about 0.4 ms per record of five typed
   properties).
 
 ## Testing and validation
@@ -127,9 +127,10 @@ Not in scope:
 - `idn-email`, `idn-hostname`, `iri`, `iri-reference` and `uri-template` are
   not checked.
 - Interpretive overhead dominates: validating the meta-schema against three
-  meta-schema documents a hundred times takes about 11 s. Each call from
-  outside the deck rebuilds the `Schema` struct at the module boundary, so
-  new `Schema` fields cost on every call.
+  meta-schema documents a hundred times takes about 6 s (an estimate,
+  scaled from earlier measurements). Each call from outside the deck
+  rebuilds the `Schema` struct at the module boundary, so new `Schema`
+  fields cost on every call.
 - On interpreters where `json.typeOf` throws for a missing pointer instead
   of returning `"missing"`, the deck reads kinds through its own guard.
 

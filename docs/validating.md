@@ -114,8 +114,8 @@ matching hang.
 - Against a fixed schema, run time grows linearly with the size of the value:
   every keyword visits each property, item or character a bounded number of
   times, `uniqueItems` included (20,000 distinct integers from 2^62: 137 ms).
-  Throughput is roughly 0.7 ms per record of five typed properties (100,000
-  records, 7.7 MB: 71 s on 0.25.0-dev+47), so bound the size of an untrusted
+  Throughput is roughly 0.4 ms per record of five typed properties (5,000
+  records: 2.1 s on 0.28.0), so bound the size of an untrusted
   value before validating it where run time matters.
 - A schema can make evaluation take exponential time, for example `allOf`
   lists that repeat a `$ref` level after level. An untrusted schema is not
